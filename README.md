@@ -95,6 +95,7 @@ MIT License — free to use for personal & commercial apps.
 
 ---
 
-✨ Now anyone can fork your repo, run `npm install`, and instantly run React as a desktop app with Electron.
+✨ Now anyone can fork your repo, run `node setup.mjs --install`, and instantly run React as a desktop app with Electron.
 
 ---
+
