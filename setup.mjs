@@ -18,7 +18,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 
-const ROOT = process.cwd();
+// const ROOT = process.cwd();
 const ARGV = new Set(process.argv.slice(2));
 const DO_INSTALL = ARGV.has("--install");
 const FORCE = ARGV.has("--force");
@@ -32,33 +32,69 @@ const exists = async (p) => {
   try { await fs.access(p); return true; } catch { return false; }
 };
 
+// -------------------------
+// Auto-detect project root
+// -------------------------
+async function findProjectRoot(start = process.cwd()) {
+  let current = start;
+  while (true) {
+    if (await exists(path.join(current, "package.json"))) return current;
+    const parent = path.dirname(current);
+    if (parent === current) break; // reached filesystem root
+    current = parent;
+  }
+  fail("Cannot find project root (package.json not found). Run inside a React project.");
+}
+
+const ROOT = await findProjectRoot();
+log("Project root detected at:", ROOT);
+
 const ensureDir = async (p) => {
   if (!(await exists(p))) await fs.mkdir(p, { recursive: true });
 };
 
-const safeWrite = async (filePath, content, options = { force: false }) => {
-  const p = path.resolve(filePath);
-  if (await exists(p)) {
-    if (!options.force) {
-      // If file already exists and content identical -> skip
-      const old = await fs.readFile(p, "utf8");
-      if (old === content) {
-        log(`Unchanged: ${filePath}`);
-        return false;
-      }
-      // otherwise backup
-      const bak = `${p}.bak-electronize`;
-      await fs.copyFile(p, bak).catch(() => {});
+// -------------------------
+// Safe write (backup if exists)
+// -------------------------
+
+// const safeWrite = async (filePath, content, options = { force: false }) => {
+//   const p = path.resolve(filePath);
+//   if (await exists(p)) {
+//     if (!options.force) {
+//       // If file already exists and content identical -> skip
+//       const old = await fs.readFile(p, "utf8");
+//       if (old === content) {
+//         log(`Unchanged: ${filePath}`);
+//         return false;
+//       }
+//       // otherwise backup
+//       const bak = `${p}.bak-electronize`;
+//       await fs.copyFile(p, bak).catch(() => {});
+//       warn(`Backed up existing file to ${bak}`);
+//     }
+//   }
+//   await ensureDir(path.dirname(p));
+//   await fs.writeFile(p, content, "utf8");
+//   log(`Wrote: ${filePath}`);
+//   return true;
+// };
+async function safeWrite(filePath, content, force = false) {
+  const absPath = path.resolve(filePath);
+  if (await exists(absPath)) {
+    if (!force) {
+      const old = await fs.readFile(absPath, "utf8");
+      if (old === content) { log(`Unchanged: ${filePath}`); return; }
+      const bak = `${absPath}.bak-electronize`;
+      await fs.copyFile(absPath, bak).catch(() => {});
       warn(`Backed up existing file to ${bak}`);
     }
   }
-  await ensureDir(path.dirname(p));
-  await fs.writeFile(p, content, "utf8");
-  log(`Wrote: ${filePath}`);
-  return true;
-};
+  await ensureDir(path.dirname(absPath));
+  await fs.writeFile(absPath, content, "utf8");
+  ok(`Wrote: ${filePath}`);
+}
 
-const readJSON = async (p) => JSON.parse(await fs.readFile(p, "utf8"));
+// const readJSON = async (p) => JSON.parse(await fs.readFile(p, "utf8"));
 const writeJSON = async (p, obj) => safeWrite(p, JSON.stringify(obj, null, 2) + "\n", { force: true });
 
 /* -------------------------
