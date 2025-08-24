@@ -26,10 +26,18 @@ const FORCE = ARGV.has("--force");
 const log = (...a) => console.log("›", ...a);
 const ok = (...a) => console.log("✅", ...a);
 const warn = (...a) => console.warn("⚠", ...a);
-const fail = (m) => { console.error("❌", m); process.exit(1); };
+const fail = (m) => {
+  console.error("❌", m);
+  process.exit(1);
+};
 
 const exists = async (p) => {
-  try { await fs.access(p); return true; } catch { return false; }
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 // -------------------------
@@ -43,7 +51,9 @@ async function findProjectRoot(start = process.cwd()) {
     if (parent === current) break; // reached filesystem root
     current = parent;
   }
-  fail("Cannot find project root (package.json not found). Run inside a React project.");
+  fail(
+    "Cannot find project root (package.json not found). Run inside a React project."
+  );
 }
 
 const ROOT = await findProjectRoot();
@@ -83,7 +93,10 @@ async function safeWrite(filePath, content, force = false) {
   if (await exists(absPath)) {
     if (!force) {
       const old = await fs.readFile(absPath, "utf8");
-      if (old === content) { log(`Unchanged: ${filePath}`); return; }
+      if (old === content) {
+        log(`Unchanged: ${filePath}`);
+        return;
+      }
       const bak = `${absPath}.bak-electronize`;
       await fs.copyFile(absPath, bak).catch(() => {});
       warn(`Backed up existing file to ${bak}`);
@@ -95,7 +108,8 @@ async function safeWrite(filePath, content, force = false) {
 }
 
 // const readJSON = async (p) => JSON.parse(await fs.readFile(p, "utf8"));
-const writeJSON = async (p, obj) => safeWrite(p, JSON.stringify(obj, null, 2) + "\n", { force: true });
+const writeJSON = async (p, obj) =>
+  safeWrite(p, JSON.stringify(obj, null, 2) + "\n", { force: true });
 
 /* -------------------------
    Safety & environment checks
@@ -105,7 +119,9 @@ const nodeVerOk = (() => {
   return v[0] >= 18;
 })();
 if (!nodeVerOk) {
-  warn("Node version < 18 detected. This script expects Node 18+. Continue at your own risk.");
+  warn(
+    "Node version < 18 detected. This script expects Node 18+. Continue at your own risk."
+  );
 }
 
 /* -------------------------
@@ -120,12 +136,14 @@ const TSCONFIG_ELECTRON = path.join(ROOT, "tsconfig.electron.json");
 const VITE_ELECTRON = path.join(ROOT, "vite.electron.config.ts");
 const VITE_RENDERER = path.join(ROOT, "vite.renderer.config.ts");
 const ELECTRON_BUILDER_YML = path.join(ROOT, "electron-builder.yml");
+const TSCONFIG_NODE = path.join(ROOT, "tsconfig.node.json");
 
 /* -------------------------
    Step 1: Move src -> src/ui (non-destructive)
    ------------------------- */
 async function moveSrcToUi() {
-  if (!(await exists(SRC))) fail("No src/ directory found. Run this in the React project root.");
+  if (!(await exists(SRC)))
+    fail("No src/ directory found. Run this in the React project root.");
 
   if (await exists(UI)) {
     log("src/ui already exists — skipping move.");
@@ -266,7 +284,16 @@ console.log("Preload script loaded!");
 /* -------------------------
    Step 3: Patch index.html to import /src/ui/<entry>
    ------------------------- */
-const ENTRY_CANDIDATES = ["main.tsx","main.jsx","index.tsx","index.jsx","main.ts","index.ts","main.js","index.js"];
+const ENTRY_CANDIDATES = [
+  "main.tsx",
+  "main.jsx",
+  "index.tsx",
+  "index.jsx",
+  "main.ts",
+  "index.ts",
+  "main.js",
+  "index.js",
+];
 
 async function detectEntry() {
   for (const c of ENTRY_CANDIDATES) {
@@ -301,7 +328,8 @@ async function patchIndexHtml(entry) {
 
   let html = await fs.readFile(INDEX_HTML, "utf8");
   // Replace existing module script if present
-  const moduleTagRegex = /<script[^>]*type=["']module["'][^>]*src=["'][^"']+["'][^>]*>\s*<\/script>/i;
+  const moduleTagRegex =
+    /<script[^>]*type=["']module["'][^>]*src=["'][^"']+["'][^>]*>\s*<\/script>/i;
   if (moduleTagRegex.test(html)) {
     html = html.replace(moduleTagRegex, relScript);
   } else if (!html.includes(relScript)) {
@@ -316,24 +344,40 @@ async function patchIndexHtml(entry) {
 /* -------------------------
    Step 4: Write tsconfig.electron.json, vite configs, electron-builder.yml
    ------------------------- */
-const TSCONFIG_ELECTRON_CONTENT = {
-  "extends": "./tsconfig.node.json",
-  "compilerOptions": {
-    "outDir": "src/electron",
-    "lib": ["ES2022"],
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "resolveJsonModule": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true
+const TSCONFIG_NODE_CONTENT = {
+  compilerOptions: {
+    target: "ES2022",
+    module: "ESNext",
+    moduleResolution: "NodeNext",
+    lib: ["DOM", "ES2022"],
+    allowJs: true,
+    jsx: "react-jsx",
+    strict: true,
+    esModuleInterop: true,
+    skipLibCheck: true,
+    resolveJsonModule: true,
   },
-  "include": ["src/electron/**/*.ts"],
-  "exclude": ["node_modules", "dist-react", "src/electron/main.ts"]
+  include: ["src"],
+};
+
+const TSCONFIG_ELECTRON_CONTENT = {
+  extends: "./tsconfig.node.json",
+  compilerOptions: {
+    outDir: "src/electron",
+    lib: ["ES2022"],
+    target: "ES2022",
+    module: "NodeNext",
+    moduleResolution: "NodeNext",
+    allowSyntheticDefaultImports: true,
+    esModuleInterop: true,
+    skipLibCheck: true,
+    strict: true,
+    resolveJsonModule: true,
+    noEmit: true,
+    allowImportingTsExtensions: true,
+  },
+  include: ["src/electron/**/*.ts"],
+  exclude: ["node_modules", "dist-react", "src/electron/main.ts"],
 };
 
 const VITE_ELECTRON_CONTENT = `import { defineConfig } from 'vite';
@@ -418,40 +462,57 @@ linux:
 const DESIRED_SCRIPTS = {
   "dev:react": "vite",
   "dev:electron": "electron .",
-  "dev": "concurrently \"npm run dev:react\" \"npm run dev:electron\"",
-  "lint": "eslint .",
-  "preview": "vite preview",
-  "build": "tsc -b && vite build",
+  dev: 'concurrently "npm run dev:react" "npm run dev:electron"',
+  lint: "eslint .",
+  preview: "vite preview",
+  build: "tsc -b && vite build",
   "electron:tsc": "tsc -p tsconfig.electron.json",
-  "electron:dev": "cross-env NODE_ENV=development npm run electron:tsc && vite --config vite.electron.config.ts",
-  "electron:build": "cross-env NODE_ENV=production npm run electron:tsc && vite build --config vite.renderer.config.ts",
+  "electron:dev":
+    "cross-env NODE_ENV=development npm run electron:tsc && vite --config vite.electron.config.ts",
+  "electron:build":
+    "cross-env NODE_ENV=production npm run electron:tsc && vite build --config vite.renderer.config.ts",
   "build:electron": "npx electron-builder --config electron-builder.yml --dir",
-  "package": "npx electron-builder --config electron-builder.yml"
+  package: "npx electron-builder --config electron-builder.yml",
 };
 
 const DESIRED_DEVDEPS = {
   "cross-env": "^10.0.0",
-  "electron": "^32.1.2",
+  electron: "^32.1.2",
   "electron-builder": "^25.0.5",
-  "vite": "^5.4.2",
+  vite: "^5.4.2",
   "vite-plugin-electron": "^0.29.0",
   "vite-plugin-electron-renderer": "^0.14.6",
-  "concurrently": "^8.2.2",
+  concurrently: "^8.2.2",
   "wait-on": "^7.0.1",
-  "typescript": "^5.2.0"
+  typescript: "^5.2.0",
 };
+async function ensureTsconfigNode() {
+  if (!(await exists(TSCONFIG_NODE))) {
+    await safeWrite(
+      TSCONFIG_NODE,
+      JSON.stringify(TSCONFIG_NODE_CONTENT, null, 2)
+    );
+    ok("Created tsconfig.node.json");
+  } else {
+    log("tsconfig.node.json already exists -> skipping");
+  }
+}
 
 async function patchPackageJson() {
   if (!(await exists(PACKAGE_JSON))) fail("package.json not found.");
   const originalPkg = await fs.readFile(PACKAGE_JSON, "utf8");
   // backup original package.json
-  await safeWrite(PACKAGE_JSON + ".bak-electronize", originalPkg, { force: true });
+  await safeWrite(PACKAGE_JSON + ".bak-electronize", originalPkg, {
+    force: true,
+  });
 
   const pkg = JSON.parse(originalPkg);
 
   // set type: module
   if (pkg.type && pkg.type !== "module") {
-    warn(`Existing package.json 'type' is '${pkg.type}' — backing up and overriding with 'module'.`);
+    warn(
+      `Existing package.json 'type' is '${pkg.type}' — backing up and overriding with 'module'.`
+    );
   }
   pkg.type = "module";
   // set main
@@ -466,14 +527,19 @@ async function patchPackageJson() {
       const bakKey = `_backup_${k}`;
       if (!pkg.scripts[bakKey]) pkg.scripts[bakKey] = pkg.scripts[k];
       pkg.scripts[k] = v;
-      warn(`script "${k}" existed and was saved to scripts.${bakKey} before updating.`);
+      warn(
+        `script "${k}" existed and was saved to scripts.${bakKey} before updating.`
+      );
     }
   }
 
   // merge devDependencies (do not overwrite existing versions)
   pkg.devDependencies = pkg.devDependencies || {};
   for (const [dep, ver] of Object.entries(DESIRED_DEVDEPS)) {
-    if (!pkg.devDependencies[dep] && !(pkg.dependencies && pkg.dependencies[dep])) {
+    if (
+      !pkg.devDependencies[dep] &&
+      !(pkg.dependencies && pkg.dependencies[dep])
+    ) {
       pkg.devDependencies[dep] = ver;
     } else {
       // exists - keep existing
@@ -490,7 +556,8 @@ async function patchPackageJson() {
 async function ensurePublicIcons() {
   const PUB = path.join(ROOT, "public");
   await ensureDir(PUB);
-  const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+  const pngBase64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
   const png = Buffer.from(pngBase64, "base64");
   const icoPath = path.join(PUB, "favicon.ico");
   const pngPath = path.join(PUB, "icon.png");
@@ -502,15 +569,32 @@ async function ensurePublicIcons() {
 /* -------------------------
    Step 7: Optionally run npm install
    ------------------------- */
+async function runCommand(cmd, args, desc) {
+  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+  return new Promise((resolve, reject) => {
+    const p = spawn(npmCmd, args, {
+      stdio: "inherit",
+      cwd: ROOT,
+      shell: true,
+    });
+    p.on("error", (err) => reject(err));
+    p.on("exit", (code) =>
+      code === 0 ? (desc && ok(desc), resolve()) : reject(new Error(`${desc || 'Command'} failed`))
+    );
+  });
+}
+
 async function runNpmInstall() {
   log("Running npm install to add devDependencies (this can take a few minutes)...");
-  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
-  await new Promise((resolve, reject) => {
-    const p = spawn(npmCmd, ["install"], { stdio: "inherit" });
-    p.on("exit", (code) => (code === 0 ? resolve() : reject(new Error("npm install failed"))));
-  });
-  ok("npm install finished");
+  await runCommand("npm", ["install"], "npm install finished");
+
+  // Compile Electron TypeScript
+  await runCommand("npm", ["run", "electron:tsc"], "npm run electron:tsc finished");
+
+  // Start Electron dev
+  await runCommand("npm", ["run", "electron:dev"], "npm run electron:dev finished");
 }
+
 
 /* -------------------------
    Execute
@@ -520,32 +604,45 @@ async function runNpmInstall() {
     log("Starting electronize process (ESM mode) ...");
 
     // Move src to src/ui (respect --force)
-    if (fsSync.existsSync(SRC)) {
-      await moveSrcToUi();
-    } else {
-      warn("No src/ directory found — skipping move.");
-    }
+    // if (fsSync.existsSync(SRC)) {
+    //   await moveSrcToUi();
+    // } else {
+    //   warn("No src/ directory found — skipping move.");
+    // }
 
     // ensure electron dir
     await ensureDir(ELECTRON_DIR);
 
     // Write electron main + preload (no overwrite unless --force)
-    await safeWrite(path.join(ELECTRON_DIR, "main.ts"), MAIN_TS_CONTENT, { force: FORCE });
-    await safeWrite(path.join(ELECTRON_DIR, "preload.ts"), PRELOAD_TS_CONTENT, { force: FORCE });
+    await safeWrite(path.join(ELECTRON_DIR, "main.ts"), MAIN_TS_CONTENT, {
+      force: FORCE,
+    });
+    await safeWrite(path.join(ELECTRON_DIR, "preload.ts"), PRELOAD_TS_CONTENT, {
+      force: FORCE,
+    });
 
     // Detect entry and patch index.html
     const entry = await detectEntry();
-    await patchIndexHtml(entry);
+    // await patchIndexHtml(entry);
+
+    // Write tsconfig.node.json
+    await ensureTsconfigNode();
 
     // Write tsconfig.electron.json
-    await safeWrite(TSCONFIG_ELECTRON, JSON.stringify(TSCONFIG_ELECTRON_CONTENT, null, 2), { force: FORCE });
+    await safeWrite(
+      TSCONFIG_ELECTRON,
+      JSON.stringify(TSCONFIG_ELECTRON_CONTENT, null, 2),
+      { force: FORCE }
+    );
 
     // Write vite config files
     await safeWrite(VITE_ELECTRON, VITE_ELECTRON_CONTENT, { force: FORCE });
     await safeWrite(VITE_RENDERER, VITE_RENDERER_CONTENT, { force: FORCE });
 
     // electron-builder.yml
-    await safeWrite(ELECTRON_BUILDER_YML, ELECTRON_BUILDER_YML_CONTENT, { force: FORCE });
+    await safeWrite(ELECTRON_BUILDER_YML, ELECTRON_BUILDER_YML_CONTENT, {
+      force: FORCE,
+    });
 
     // patch package.json
     await patchPackageJson();
@@ -557,7 +654,9 @@ async function runNpmInstall() {
     if (DO_INSTALL) {
       await runNpmInstall();
     } else {
-      log("Skipped npm install. Run `npm install` manually or re-run with --install.");
+      log(
+        "Skipped npm install. Run `npm install` manually or re-run with --install."
+      );
     }
 
     ok("✅ Electronization complete!");

@@ -27,16 +27,20 @@ git clone https://github.com/alix2i0/react-to-electron.git
 cd react-to-electron
 ```
 
-### 2️⃣ Install dependencies
+### 2️⃣ Install setup
+
+```sh
+node setup.mjs --install      # auto-install devDependencies
+```
+
+### 3️⃣ Error if any do 
 
 ```sh
 npm install
-```
 
-### 3️⃣ Run in development
+npm run electron:tsc
 
-```sh
-npm run dev
+npm run electron:dev
 ```
 
 This will:
@@ -47,22 +51,8 @@ This will:
 
 ---
 
-## 🏗️ Build for Production
 
-To package your app for distribution:
-
-```sh
-npm run build
-npm run electron:build
-```
-
-This will generate an installer for your OS inside the **`dist/`** folder.
-
----
-
----
-
-## ⚙️ Scripts
+## ⚙️ Scripts check package.json
 
 | Command                  | Description                        |
 | ------------------------ | ---------------------------------- |
